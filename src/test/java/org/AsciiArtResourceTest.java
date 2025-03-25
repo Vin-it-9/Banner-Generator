@@ -1,21 +1,14 @@
 package org;
 
+
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.is;
+
 
 @QuarkusTest
-class ExampleResourceTest {
-    @Test
-    void testHelloEndpoint() {
-        given()
-                .when().get("/hello")
-                .then()
-                .statusCode(200)
-                .body(is("Hello from Quarkus REST"));
-    }
+class AsciiArtResourceTest {
 
     @Test
     public void testGetConvertEndpoint() {
@@ -35,5 +28,13 @@ class ExampleResourceTest {
                 .statusCode(400);
     }
 
-
+//    @Test
+//    public void testGetFontsEndpoint() {
+//        given()
+//                .when().get("/api/ascii/fonts")
+//                .then()
+//                .statusCode(200)
+//                .contentType("application/json")
+//                .body("size()", is(17));
+//    }
 }
