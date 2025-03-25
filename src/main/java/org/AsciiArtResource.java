@@ -1,10 +1,8 @@
 package org;
 
-
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.*;
 
 import java.util.List;
 
@@ -36,7 +34,7 @@ public class AsciiArtResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response convertTextToAsciiPost(AsciiRequest request) {
-        if (request.getText() == null || request.getText().isEmpty()) {
+        if (request == null || request.getText() == null || request.getText().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity("Text is required")
                     .build();
@@ -64,7 +62,7 @@ public class AsciiArtResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.TEXT_PLAIN)
     public Response getPlainAsciiArt(AsciiRequest request) {
-        if (request.getText() == null || request.getText().isEmpty()) {
+        if (request == null || request.getText() == null || request.getText().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity("Text is required")
                     .build();

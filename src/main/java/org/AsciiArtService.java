@@ -3,14 +3,12 @@ package org;
 import com.github.lalyos.jfiglet.FigletFont;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.annotation.PostConstruct;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.*;
+import java.net.*;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.logging.Logger;
 
 @ApplicationScoped
@@ -28,18 +26,7 @@ public class AsciiArtService {
             tempFontDir = Files.createTempDirectory("figlet-fonts");
             tempFontDir.toFile().deleteOnExit();
 
-            String[] fontNames = {
-                    "standard", "banner", "big",
-                    "roman", "univers" , "slant"
-            };
-
-            for (String fontName : fontNames) {
-                extractFont(fontName);
-            }
-
-            for (String fontName : fontNames) {
-                availableFonts.add(fontName);
-            }
+            loadFontsFromResources();
 
             LOGGER.info("Initialized ASCII Art Service with fonts: " + availableFonts);
         } catch (Exception e) {
@@ -48,7 +35,58 @@ public class AsciiArtService {
         }
     }
 
-    private void extractFont(String fontName) {
+    private void loadFontsFromResources() {
+        try {
+            URL fontsDirUrl = getClass().getResource("/fonts");
+            if (fontsDirUrl == null) {
+                LOGGER.warning("Could not find fonts directory in resources");
+
+                extractFontFromClasspath(DEFAULT_FONT);
+                availableFonts.add(DEFAULT_FONT);
+                return;
+            }
+
+            URI fontsUri = fontsDirUrl.toURI();
+
+            Path fontsPath;
+            if (fontsUri.getScheme().equals("jar")) {
+                try (FileSystem fs = FileSystems.newFileSystem(fontsUri, Collections.emptyMap())) {
+                    fontsPath = fs.getPath("/fonts");
+                    processDirectoryContent(fontsPath);
+                }
+            } else {
+                fontsPath = Paths.get(fontsUri);
+                processDirectoryContent(fontsPath);
+            }
+        } catch (URISyntaxException | IOException e) {
+            LOGGER.warning("Error loading fonts from resources: " + e.getMessage());
+            extractFontFromClasspath(DEFAULT_FONT);
+            if (!availableFonts.contains(DEFAULT_FONT)) {
+                availableFonts.add(DEFAULT_FONT);
+            }
+        }
+    }
+
+    private void processDirectoryContent(Path fontsPath) throws IOException {
+        try (Stream<Path> paths = Files.list(fontsPath)) {
+            List<Path> fontFiles = paths
+                    .filter(path -> path.toString().endsWith(".flf"))
+                    .collect(Collectors.toList());
+
+            for (Path fontFile : fontFiles) {
+                String fontName = fontFile.getFileName().toString().replace(".flf", "");
+                extractFontFromClasspath(fontName);
+                availableFonts.add(fontName);
+            }
+        }
+
+        if (availableFonts.isEmpty()) {
+            extractFontFromClasspath(DEFAULT_FONT);
+            availableFonts.add(DEFAULT_FONT);
+        }
+    }
+
+    private void extractFontFromClasspath(String fontName) {
         try {
             String fontResource = "/fonts/" + fontName + ".flf";
             InputStream is = getClass().getResourceAsStream(fontResource);
@@ -73,27 +111,28 @@ public class AsciiArtService {
             return "No text provided";
         }
 
-        try {
-            // If font name is not provided or not available, use default font
-            if (fontName == null || fontName.isEmpty() || !isFontAvailable(fontName)) {
-                LOGGER.info("Using default font: " + DEFAULT_FONT);
-                fontName = DEFAULT_FONT;
-            }
+        fontName = (fontName != null) ? fontName.toLowerCase() : DEFAULT_FONT;
+        if (!isFontAvailable(fontName)) {
+            LOGGER.info("Font not available: " + fontName + ". Using default: " + DEFAULT_FONT);
+            fontName = DEFAULT_FONT;
+        }
 
+        try {
             Path fontPath = Paths.get(tempFontDir.toString(), fontName + ".flf");
+
             if (!Files.exists(fontPath)) {
-                LOGGER.warning("Font file not found: " + fontPath);
+                LOGGER.warning("Font file not found: " + fontPath + ". Falling back to default.");
                 fontPath = Paths.get(tempFontDir.toString(), DEFAULT_FONT + ".flf");
+                if (!Files.exists(fontPath)) {
+                    extractFontFromClasspath(DEFAULT_FONT);
+                }
             }
 
             return FigletFont.convertOneLine(fontPath.toFile(), text);
         } catch (IOException e) {
             LOGGER.severe("Error generating ASCII art: " + e.getMessage());
-            e.printStackTrace();
-
-            // Try with renderable internal font as fallback
             try {
-                return FigletFont.convertOneLine("small", text);
+                return FigletFont.convertOneLine(text);
             } catch (IOException ex) {
                 return "Error generating ASCII art: " + e.getMessage();
             }
